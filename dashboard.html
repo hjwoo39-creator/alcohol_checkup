@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>교수자 분석 대시보드</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="dashboard.css">
+  <!-- Chart.js 라이브러리 연동 -->
+  <script src="chart.js"></script>
+</head>
+<body>
+  <div class="dashboard-container">
+    
+    <!-- 대시보드 헤더 -->
+    <header class="dashboard-header">
+      <div class="dashboard-title-area" style="display: flex; align-items: center; gap: 16px;">
+        <img src="/도로교통공단 메인 CI.png" class="brand-logo" alt="도로교통공단 로고" style="max-height: 48px; width: auto; object-fit: contain;">
+        <div>
+          <h1>교수자 분석 대시보드</h1>
+          <p>음주운전 자가진단 예방 체크리스트 실시간 통계 및 학생 응답 관리</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button onclick="downloadCSV()" class="btn btn-outline">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          엑셀 다운로드 (CSV)
+        </button>
+      </div>
+    </header>
+
+    <!-- QR코드 안내 및 안내 링크 카드 -->
+    <div class="qr-section">
+      <div class="card qr-card">
+        <div class="qr-img-wrap">
+          <img src="/student_qr.png" width="130" height="130" alt="학생 접속 QR코드">
+        </div>
+        <div class="qr-info">
+          <h3>학생 접속 안내</h3>
+          <p>학생들이 스마트폰 카메라로 QR 코드를 스캔하거나 아래 링크로 접속하여 자가진단을 실시할 수 있습니다.</p>
+          <div class="copy-input-group">
+            <div id="studentUrl" class="copy-input">조회 중...</div>
+            <button onclick="copyLink()" class="btn btn-primary btn-sm">복사</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 실시간 통계 요약 (KPI) -->
+      <div class="kpi-card success">
+        <div class="kpi-label">총 참여 학생 수</div>
+        <div class="kpi-value" id="kpiTotal">0명</div>
+        <div class="kpi-desc">현재까지 제출 완료한 누적 인원</div>
+      </div>
+    </div>
+
+    <!-- KPI 카드 그리드 -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">가장 빈번한 위험 유형</div>
+        <div class="kpi-value" id="kpiTopType">-</div>
+        <div class="kpi-desc">가장 높은 비율을 차지한 유형</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">죄책감 요인 평균 점수</div>
+        <div class="kpi-value" id="kpiAvgGuilt">-</div>
+        <div class="kpi-desc">기준값: 24점 이상일 때 '높음'</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">운전능력 과신 평균 점수</div>
+        <div class="kpi-value" id="kpiAvgOverconfidence">-</div>
+        <div class="kpi-desc">기준값: 15점 이상일 때 '높음'</div>
+      </div>
+    </div>
+
+    <!-- 통계 시각화 섹션 (차트) -->
+    <div class="charts-grid">
+      
+      <!-- 1. 유형 분포 차트 카드 -->
+      <div class="card">
+        <div class="card-title">음주운전 자가진단 유형 분포</div>
+        <div id="typeChartsArea" style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; align-items: center;">
+          <div class="chart-wrapper" style="flex: 1; min-width: 220px; height: 260px;">
+            <canvas id="typeDoughnutChart"></canvas>
+          </div>
+          <div class="chart-wrapper" style="flex: 1; min-width: 220px; height: 260px;">
+            <canvas id="typeBarChart"></canvas>
+          </div>
+        </div>
+        <div id="typeChartsNoData" style="display: none; height: 260px; justify-content: center; align-items: center; color: var(--text-muted); font-size: 0.95rem; background: var(--bg-main); border-radius: var(--radius-md);">
+          아직 수집된 응답 데이터가 없습니다.
+        </div>
+      </div>
+
+      <!-- 2. 요인 통계 차트 카드 -->
+      <div class="card">
+        <div class="card-title">상세 심리요인 분석</div>
+        <div id="factorChartsArea" style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; align-items: center;">
+          <div class="chart-wrapper" style="flex: 1; min-width: 220px; height: 260px;">
+            <canvas id="factorAvgChart"></canvas>
+          </div>
+          <div class="chart-wrapper" style="flex: 1; min-width: 220px; height: 260px;">
+            <canvas id="factorRatioChart"></canvas>
+          </div>
+        </div>
+        <div id="factorChartsNoData" style="display: none; height: 260px; justify-content: center; align-items: center; color: var(--text-muted); font-size: 0.95rem; background: var(--bg-main); border-radius: var(--radius-md);">
+          아직 수집된 응답 데이터가 없습니다.
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 응답자 관리 테이블 섹션 -->
+    <div class="card" style="margin-bottom: 32px;">
+      <div class="card-title">학생 응답 내역 관리</div>
+      
+      <!-- 필터 및 검색 바 -->
+      <div class="filter-bar">
+        <button type="button" id="btnTodayFilter" onclick="toggleTodayFilter()" class="btn btn-outline" style="min-width: auto; padding: 10px 16px; border: 1px solid var(--border-color); font-weight: 600;">
+          오늘 통계 보기
+        </button>
+        <div style="display: flex; align-items: center; gap: 8px; border: 1px solid var(--border-color); padding: 4px 12px; border-radius: var(--radius-md); background: var(--bg-card);">
+          <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); white-space: nowrap;">일자 선택:</span>
+          <input type="date" id="filterDate" onchange="applyFilters(true)" style="border: none; padding: 4px; min-width: auto; background: transparent;">
+        </div>
+
+        <input type="text" id="searchInput" oninput="applyFilters()" placeholder="유형 검색 (예: 2가, 1나)...">
+        
+        <select id="filterType" onchange="applyFilters()">
+          <option value="">모든 유형 보기</option>
+          <option value="1가">1가형</option>
+          <option value="1나">1나형</option>
+          <option value="2가">2가형</option>
+          <option value="2나">2나형</option>
+          <option value="3가">3가형</option>
+          <option value="3나">3나형</option>
+          <option value="4가">4가형</option>
+          <option value="4나">4나형</option>
+        </select>
+
+        <select id="filterHighFactor" onchange="applyFilters()">
+          <option value="">모든 요인 상태</option>
+          <option value="죄책감">죄책감 '높음'</option>
+          <option value="운전능력 과신">운전능력 과신 '높음'</option>
+          <option value="잘못된 손익계산">잘못된 손익계산 '높음'</option>
+          <option value="감각추구성향">감각추구성향 '높음'</option>
+          <option value="충동성">충동성 '높음'</option>
+        </select>
+
+        <select id="sortSelect" onchange="applyFilters()">
+          <option value="newest">제출 시간 (최신순)</option>
+          <option value="oldest">제출 시간 (오래된순)</option>
+          <option value="guiltDesc">죄책감 높은순</option>
+          <option value="overconfidenceDesc">운전과신 높은순</option>
+        </select>
+      </div>
+
+      <!-- 응답 데이터 테이블 -->
+      <div class="table-responsive">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>번호</th>
+              <th>제출 시간</th>
+              <th>위험 유형</th>
+              <th>죄책감</th>
+              <th>운전능력 과신</th>
+              <th>잘못된 손익계산</th>
+              <th>감각추구성향</th>
+              <th>충동성</th>
+              <th>도덕성</th>
+              <th>작업</th>
+            </tr>
+          </thead>
+          <tbody id="responsesTableBody">
+            <tr>
+              <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                응답 데이터를 불러오는 중입니다...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 상세 정보 모달 창 -->
+  <div id="detailModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle">학생 상세 진단서</h2>
+        <button onclick="closeModal()" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+          <p style="font-size: 0.85rem; color: var(--text-muted);">제출 시각: <span id="modalTime" style="color: var(--text-main); font-weight: 600;">-</span></p>
+          <p style="font-size: 1.1rem; font-weight: 700; margin-top: 6px;">진단 유형: <span id="modalType" class="badge badge-type">-</span></p>
+        </div>
+        
+        <h3 style="font-size: 0.95rem; margin-bottom: 12px;">9개 세부 영역별 점수</h3>
+        <div class="detail-grid" id="modalDetailGrid">
+          <!-- 세부 요인 동적 주입 -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const thresholds = {
+      '죄책감': 24,
+      '운전능력 과신': 15,
+      '잘못된 손익계산': 10,
+      '내부귀인': 13,
+      '외부귀인': 13,
+      '자기통제력': 9,
+      '충동성': 17,
+      '감각추구성향': 24,
+      '도덕성': 19
+    };
+
+    let allResponses = [];
+    
+    // Chart.js 차트 인스턴스 저장소
+    let typeDoughnutChartInstance = null;
+    let typeBarChartInstance = null;
+    let factorAvgChartInstance = null;
+    let factorRatioChartInstance = null;
+
+    let isTodayFilterActive = false;
+
+    // 초기 데이터 조회
+    async function loadData() {
+      try {
+        const res = await fetch('/responses');
+        allResponses = await res.json();
+        
+        // 필터 및 전체 렌더링 적용
+        applyFilters();
+      } catch (err) {
+        console.error("데이터 로드 실패:", err);
+      }
+    }
+
+    // 오늘 통계 필터 활성화 토글
+    function toggleTodayFilter() {
+      isTodayFilterActive = !isTodayFilterActive;
+      const btn = document.getElementById('btnTodayFilter');
+      if (isTodayFilterActive) {
+        btn.style.backgroundColor = 'var(--primary)';
+        btn.style.color = '#ffffff';
+        btn.style.borderColor = 'var(--primary)';
+        // 특정 일자 인풋 초기화
+        document.getElementById('filterDate').value = '';
+      } else {
+        btn.style.backgroundColor = 'transparent';
+        btn.style.color = 'var(--text-main)';
+        btn.style.borderColor = 'var(--border-color)';
+      }
+      applyFilters();
+    }
+
+    // KPI 카드 업데이트
+    function renderKPI(data) {
+      const total = data.length;
+      document.getElementById('kpiTotal').innerText = `${total}명`;
+
+      if (total === 0) {
+        document.getElementById('kpiTopType').innerText = '-';
+        document.getElementById('kpiAvgGuilt').innerText = '-';
+        document.getElementById('kpiAvgOverconfidence').innerText = '-';
+        return;
+      }
+
+      // 1. 가장 빈번한 유형 구하기
+      const typeCounts = {};
+      let maxCount = 0;
+      let topType = '-';
+      
+      data.forEach(r => {
+        typeCounts[r.type] = (typeCounts[r.type] || 0) + 1;
+        if (typeCounts[r.type] > maxCount) {
+          maxCount = typeCounts[r.type];
+          topType = r.type;
+        }
+      });
+      const topTypePercent = ((maxCount / total) * 100).toFixed(0);
+      document.getElementById('kpiTopType').innerText = `${topType}형 (${topTypePercent}%)`;
+
+      // 2. 죄책감 및 운전능력 과신 평균 점수
+      let totalGuilt = 0;
+      let totalOverconfidence = 0;
+      
+      data.forEach(r => {
+        totalGuilt += r.scores['죄책감'] || 0;
+        totalOverconfidence += r.scores['운전능력 과신'] || 0;
+      });
+      
+      document.getElementById('kpiAvgGuilt').innerText = `${(totalGuilt / total).toFixed(1)}점`;
+      document.getElementById('kpiAvgOverconfidence').innerText = `${(totalOverconfidence / total).toFixed(1)}점`;
+    }
+
+    // Chart.js 시각화 차트 렌더링
+    function renderCharts(data) {
+      const total = data.length;
+      if (total === 0) {
+        document.getElementById('typeChartsArea').style.display = 'none';
+        document.getElementById('typeChartsNoData').style.display = 'flex';
+        document.getElementById('factorChartsArea').style.display = 'none';
+        document.getElementById('factorChartsNoData').style.display = 'flex';
+        return;
+      } else {
+        document.getElementById('typeChartsArea').style.display = 'flex';
+        document.getElementById('typeChartsNoData').style.display = 'none';
+        document.getElementById('factorChartsArea').style.display = 'flex';
+        document.getElementById('factorChartsNoData').style.display = 'none';
+      }
+
+      const typeKeys = ["1가", "1나", "2가", "2나", "3가", "3나", "4가", "4나"];
+      const typeCounts = typeKeys.map(type => data.filter(r => r.type === type).length);
+      
+      const factorKeys = Object.keys(thresholds);
+      
+      // 요인별 총점 및 높음 개수 집계
+      const factorAverages = factorKeys.map(f => {
+        if (data.length === 0) return 0;
+        const totalSum = data.reduce((sum, r) => sum + (r.scores[f] || 0), 0);
+        return parseFloat((totalSum / data.length).toFixed(1));
+      });
+
+      const factorHighPercentages = factorKeys.map(f => {
+        if (data.length === 0) return 0;
+        const highCount = data.filter(r => r.scores[f] >= thresholds[f]).length;
+        return parseFloat(((highCount / data.length) * 100).toFixed(0));
+      });
+
+      // --- 1. 유형 도넛 차트 ---
+      const ctxDoughnut = document.getElementById('typeDoughnutChart').getContext('2d');
+      if (typeDoughnutChartInstance) typeDoughnutChartInstance.destroy();
+      typeDoughnutChartInstance = new Chart(ctxDoughnut, {
+        type: 'doughnut',
+        data: {
+          labels: typeKeys,
+          datasets: [{
+            data: typeCounts,
+            backgroundColor: [
+              '#2563eb', '#3b82f6', '#10b981', '#34d399',
+              '#f59e0b', '#fbbf24', '#ef4444', '#f87171'
+            ]
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'left', labels: { boxWidth: 10, font: { size: 10 } } },
+            title: { display: true, text: '유형별 점유율', font: { size: 12, weight: 'bold' } }
+          }
+        }
+      });
+
+      // --- 2. 유형 막대 차트 ---
+      const ctxBar = document.getElementById('typeBarChart').getContext('2d');
+      if (typeBarChartInstance) typeBarChartInstance.destroy();
+      typeBarChartInstance = new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+          labels: typeKeys,
+          datasets: [{
+            label: '인원수(명)',
+            data: typeCounts,
+            backgroundColor: '#2563eb',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            title: { display: true, text: '유형별 빈도수', font: { size: 12, weight: 'bold' } }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 9 } } },
+            x: { ticks: { font: { size: 10 } } }
+          }
+        }
+      });
+
+      // --- 3. 요인 평균 막대 차트 ---
+      const ctxFactorAvg = document.getElementById('factorAvgChart').getContext('2d');
+      if (factorAvgChartInstance) factorAvgChartInstance.destroy();
+      factorAvgChartInstance = new Chart(ctxFactorAvg, {
+        type: 'bar',
+        data: {
+          labels: factorKeys,
+          datasets: [
+            {
+              label: '평균 점수',
+              data: factorAverages,
+              backgroundColor: '#10b981',
+              borderRadius: 4
+            },
+            {
+              label: '위험 기준점',
+              data: factorKeys.map(f => thresholds[f]),
+              type: 'line',
+              borderColor: '#ef4444',
+              borderWidth: 2,
+              borderDash: [4, 4],
+              pointRadius: 0,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true, labels: { boxWidth: 12, font: { size: 9 } } },
+            title: { display: true, text: '요인별 평균 점수', font: { size: 12, weight: 'bold' } }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { font: { size: 9 } } },
+            x: { ticks: { font: { size: 9 }, maxRotation: 45, minRotation: 45 } }
+          }
+        }
+      });
+
+      // --- 4. 요인 높음 비율 누적 차트 ---
+      const ctxFactorRatio = document.getElementById('factorRatioChart').getContext('2d');
+      if (factorRatioChartInstance) factorRatioChartInstance.destroy();
+      factorRatioChartInstance = new Chart(ctxFactorRatio, {
+        type: 'bar',
+        data: {
+          labels: factorKeys,
+          datasets: [
+            {
+              label: '높음 (%)',
+              data: factorHighPercentages,
+              backgroundColor: '#2563eb',
+              borderRadius: 4
+            },
+            {
+              label: '낮음 (%)',
+              data: factorHighPercentages.map(p => 100 - p),
+              backgroundColor: '#e2e8f0',
+              borderRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 9 } } },
+            title: { display: true, text: '요인별 위험군(높음) 비율', font: { size: 12, weight: 'bold' } }
+          },
+          scales: {
+            y: { stacked: true, max: 100, ticks: { font: { size: 9 } } },
+            x: { stacked: true, ticks: { font: { size: 9 }, maxRotation: 45, minRotation: 45 } }
+          }
+        }
+      });
+    }
+
+    // 테이블 필터링 및 렌더링
+    function applyFilters(isFromDateInput) {
+      if (isFromDateInput) {
+        // 날짜 선택기를 사용하면 '오늘 통계' 필터 해제
+        isTodayFilterActive = false;
+        const btn = document.getElementById('btnTodayFilter');
+        if (btn) {
+          btn.style.backgroundColor = 'transparent';
+          btn.style.color = 'var(--text-main)';
+          btn.style.borderColor = 'var(--border-color)';
+        }
+      }
+
+      const searchVal = document.getElementById('searchInput').value.trim().toLowerCase();
+      const filterTypeVal = document.getElementById('filterType').value;
+      const filterHighFactorVal = document.getElementById('filterHighFactor').value;
+      const sortVal = document.getElementById('sortSelect').value;
+      const filterDateVal = document.getElementById('filterDate').value;
+
+      let filtered = [...allResponses];
+
+      // 1. 날짜 필터 적용
+      if (isTodayFilterActive) {
+        const todayStr = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD
+        filtered = filtered.filter(r => r.submittedAt && r.submittedAt.split('T')[0] === todayStr);
+      } else if (filterDateVal) {
+        filtered = filtered.filter(r => r.submittedAt && r.submittedAt.split('T')[0] === filterDateVal);
+      }
+
+      // 2. 검색어 필터
+      if (searchVal) {
+        filtered = filtered.filter(r => r.type.toLowerCase().includes(searchVal));
+      }
+
+      // 3. 위험 유형 필터
+      if (filterTypeVal) {
+        filtered = filtered.filter(r => r.type === filterTypeVal);
+      }
+
+      // 4. 특정 요인 '높음' 필터
+      if (filterHighFactorVal) {
+        filtered = filtered.filter(r => r.scores[filterHighFactorVal] >= thresholds[filterHighFactorVal]);
+      }
+
+      // 5. 정렬
+      if (sortVal === 'newest') {
+        filtered.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+      } else if (sortVal === 'oldest') {
+        filtered.sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt));
+      } else if (sortVal === 'guiltDesc') {
+        filtered.sort((a, b) => (b.scores['죄책감'] || 0) - (a.scores['죄책감'] || 0));
+      } else if (sortVal === 'overconfidenceDesc') {
+        filtered.sort((a, b) => (b.scores['운전능력 과신'] || 0) - (a.scores['운전능력 과신'] || 0));
+      }
+
+      // 전체 분석 컴포넌트 렌더링
+      renderKPI(filtered);
+      renderCharts(filtered);
+      renderTable(filtered);
+    }
+
+    // 테이블 본문 그리기
+    function renderTable(data) {
+      const tbody = document.getElementById('responsesTableBody');
+      tbody.innerHTML = '';
+
+      if (data.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">
+              조건에 맞는 응답 데이터가 없습니다.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      data.forEach((r, idx) => {
+        const timeStr = r.submittedAt ? new Date(r.submittedAt).toLocaleString('ko-KR', {
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        }) : '-';
+        
+        const tr = document.createElement('tr');
+        tr.addEventListener('click', () => showDetailModal(r));
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td>${timeStr}</td>
+          <td><span class="badge badge-type">${r.type}형</span></td>
+          <td>${(r.scores['죄책감'] || 0)}점</td>
+          <td>${(r.scores['운전능력 과신'] || 0)}점</td>
+          <td>${(r.scores['잘못된 손익계산'] || 0)}점</td>
+          <td>${(r.scores['감각추구성향'] || 0)}점</td>
+          <td>${(r.scores['충동성'] || 0)}점</td>
+          <td>${(r.scores['도덕성'] || 0)}점</td>
+          <td>
+            <button class="btn btn-outline btn-sm delete-btn" style="color: #ef4444; border-color: #fee2e2; background: #fef2f2; padding: 4px 8px; font-size: 0.75rem; font-weight: bold; border-radius: var(--radius-sm);">삭제</button>
+          </td>
+        `;
+        
+        // 삭제 버튼 이벤트 바인딩 (행 클릭 모달 팝업 버블링 방지)
+        const delBtn = tr.querySelector('.delete-btn');
+        delBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteResponse(r.id);
+        });
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 개별 응답 삭제 처리
+    async function deleteResponse(id) {
+      if (!id) {
+        alert("삭제할 수 없는 응답입니다 (이전 테스트 데이터 또는 고유 ID 누락).");
+        return;
+      }
+      if (!confirm("정말 이 응답 데이터를 영구히 삭제하시겠습니까?\n삭제 후 통계 분석에 즉시 반영됩니다.")) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/responses/${id}`, {
+          method: 'DELETE'
+        });
+        const result = await res.json();
+        
+        if (result.success) {
+          alert("데이터가 정상적으로 삭제되었습니다.");
+          loadData(); // 대시보드 갱신
+        } else {
+          alert("삭제 실패: " + (result.message || "알 수 없는 오류"));
+        }
+      } catch (err) {
+        console.error(err);
+        alert("서버 삭제 통신 실패");
+      }
+    }
+
+    // 상세 모달 열기
+    function showDetailModal(r) {
+      const modal = document.getElementById('detailModal');
+      const timeStr = r.submittedAt ? new Date(r.submittedAt).toLocaleString('ko-KR') : '-';
+      
+      document.getElementById('modalTime').innerText = timeStr;
+      document.getElementById('modalType').innerText = r.type + '형';
+
+      const grid = document.getElementById('modalDetailGrid');
+      grid.innerHTML = '';
+
+      Object.keys(thresholds).forEach(f => {
+        const score = r.scores[f] || 0;
+        const limit = thresholds[f];
+        const isHigh = score >= limit;
+        
+        const item = document.createElement('div');
+        item.classList.add('detail-item');
+        item.innerHTML = `
+          <span class="detail-label">${f}</span>
+          <div>
+            <span class="detail-val" style="margin-right: 6px;">${score}점</span>
+            <span class="badge ${isHigh ? 'badge-high' : 'badge-low'}" style="padding: 2px 6px; font-size: 0.65rem;">
+              ${isHigh ? '높음' : '낮음'}
+            </span>
+          </div>
+        `;
+        grid.appendChild(item);
+      });
+
+      modal.classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('detailModal').classList.remove('active');
+    }
+
+    // 모달 바깥 터치 시 닫기
+    window.addEventListener('click', (e) => {
+      const modal = document.getElementById('detailModal');
+      if (e.target === modal) {
+        closeModal();
+      }
+    });
+
+    // 주소 복사 기능
+    function copyLink() {
+      const urlText = document.getElementById('studentUrl').innerText;
+      navigator.clipboard.writeText(urlText).then(() => {
+        alert('접속 주소가 클립보드에 복사되었습니다.');
+      }).catch(err => {
+        console.error("복사 실패:", err);
+      });
+    }
+
+    // 학생 접속 주소 API 로드
+    fetch('/student-url')
+      .then(r => r.json())
+      .then(data => {
+        document.getElementById('studentUrl').innerText = data.url;
+      });
+
+    // 초기 데이터 로딩 및 3초 주기 폴링
+    loadData();
+    setInterval(loadData, 3000);
+
+    // CSV 파일 다운로드 기능
+    function downloadCSV() {
+      if (allResponses.length === 0) {
+        alert("다운로드할 응답 데이터가 없습니다.");
+        return;
+      }
+      
+      let csv = "응답번호,제출일시,위험유형,죄책감,운전능력 과신,잘못된 손익계산,내부귀인,외부귀인,자기통제력,충동성,감각추구성향,도덕성\n";
+
+      allResponses.forEach((r, index) => {
+        const timeStr = r.submittedAt ? new Date(r.submittedAt).toISOString() : '-';
+        csv += [
+          index + 1,
+          timeStr,
+          r.type,
+          r.scores["죄책감"] || 0,
+          r.scores["운전능력 과신"] || 0,
+          r.scores["잘못된 손익계산"] || 0,
+          r.scores["내부귀인"] || 0,
+          r.scores["외부귀인"] || 0,
+          r.scores["자기통제력"] || 0,
+          r.scores["충동성"] || 0,
+          r.scores["감각추구성향"] || 0,
+          r.scores["도덕성"] || 0
+        ].join(",");
+        csv += "\n";
+      });
+
+      const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `음주운전_자가진단_결과_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>

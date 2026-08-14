@@ -57,24 +57,7 @@
       </div>
     </div>
 
-    <!-- KPI 카드 그리드 -->
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">가장 빈번한 위험 유형</div>
-        <div class="kpi-value" id="kpiTopType">-</div>
-        <div class="kpi-desc">가장 높은 비율을 차지한 유형</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">죄책감 요인 평균 점수</div>
-        <div class="kpi-value" id="kpiAvgGuilt">-</div>
-        <div class="kpi-desc">기준값: 24점 이상일 때 '높음'</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">운전능력 과신 평균 점수</div>
-        <div class="kpi-value" id="kpiAvgOverconfidence">-</div>
-        <div class="kpi-desc">기준값: 15점 이상일 때 '높음'</div>
-      </div>
-    </div>
+
 
     <!-- 통계 시각화 섹션 (차트) -->
     <div class="charts-grid">
@@ -95,21 +78,7 @@
         </div>
       </div>
 
-      <!-- 2. 요인 통계 차트 카드 -->
-      <div class="card">
-        <div class="card-title">상세 심리요인 분석</div>
-        <div id="factorChartsArea" style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; align-items: center;">
-          <div class="chart-wrapper" style="flex: 1; min-width: 220px; height: 260px;">
-            <canvas id="factorAvgChart"></canvas>
-          </div>
-          <div class="chart-wrapper" style="flex: 1; min-width: 220px; height: 260px;">
-            <canvas id="factorRatioChart"></canvas>
-          </div>
-        </div>
-        <div id="factorChartsNoData" style="display: none; height: 260px; justify-content: center; align-items: center; color: var(--text-muted); font-size: 0.95rem; background: var(--bg-main); border-radius: var(--radius-md);">
-          아직 수집된 응답 데이터가 없습니다.
-        </div>
-      </div>
+
 
     </div>
 
@@ -267,40 +236,6 @@
     function renderKPI(data) {
       const total = data.length;
       document.getElementById('kpiTotal').innerText = `${total}명`;
-
-      if (total === 0) {
-        document.getElementById('kpiTopType').innerText = '-';
-        document.getElementById('kpiAvgGuilt').innerText = '-';
-        document.getElementById('kpiAvgOverconfidence').innerText = '-';
-        return;
-      }
-
-      // 1. 가장 빈번한 유형 구하기
-      const typeCounts = {};
-      let maxCount = 0;
-      let topType = '-';
-      
-      data.forEach(r => {
-        typeCounts[r.type] = (typeCounts[r.type] || 0) + 1;
-        if (typeCounts[r.type] > maxCount) {
-          maxCount = typeCounts[r.type];
-          topType = r.type;
-        }
-      });
-      const topTypePercent = ((maxCount / total) * 100).toFixed(0);
-      document.getElementById('kpiTopType').innerText = `${topType}형 (${topTypePercent}%)`;
-
-      // 2. 죄책감 및 운전능력 과신 평균 점수
-      let totalGuilt = 0;
-      let totalOverconfidence = 0;
-      
-      data.forEach(r => {
-        totalGuilt += r.scores['죄책감'] || 0;
-        totalOverconfidence += r.scores['운전능력 과신'] || 0;
-      });
-      
-      document.getElementById('kpiAvgGuilt').innerText = `${(totalGuilt / total).toFixed(1)}점`;
-      document.getElementById('kpiAvgOverconfidence').innerText = `${(totalOverconfidence / total).toFixed(1)}점`;
     }
 
     // Chart.js 시각화 차트 렌더링
@@ -309,32 +244,25 @@
       if (total === 0) {
         document.getElementById('typeChartsArea').style.display = 'none';
         document.getElementById('typeChartsNoData').style.display = 'flex';
-        document.getElementById('factorChartsArea').style.display = 'none';
-        document.getElementById('factorChartsNoData').style.display = 'flex';
         return;
       } else {
         document.getElementById('typeChartsArea').style.display = 'flex';
         document.getElementById('typeChartsNoData').style.display = 'none';
-        document.getElementById('factorChartsArea').style.display = 'flex';
-        document.getElementById('factorChartsNoData').style.display = 'none';
       }
 
       const typeKeys = ["1가", "1나", "2가", "2나", "3가", "3나", "4가", "4나"];
       const typeCounts = typeKeys.map(type => data.filter(r => r.type === type).length);
       
-      const factorKeys = Object.keys(thresholds);
-      
-      // 요인별 총점 및 높음 개수 집계
-      const factorAverages = factorKeys.map(f => {
-        if (data.length === 0) return 0;
-        const totalSum = data.reduce((sum, r) => sum + (r.scores[f] || 0), 0);
-        return parseFloat((totalSum / data.length).toFixed(1));
+      // 각 유형의 백분율 점유율과 수치(명)를 라벨에 함께 표시
+      const typeLabelsPercent = typeKeys.map((type, idx) => {
+        const count = typeCounts[idx];
+        const percent = total > 0 ? ((count / total) * 100).toFixed(0) : 0;
+        return `${type}형 ${percent}%`;
       });
 
-      const factorHighPercentages = factorKeys.map(f => {
-        if (data.length === 0) return 0;
-        const highCount = data.filter(r => r.scores[f] >= thresholds[f]).length;
-        return parseFloat(((highCount / data.length) * 100).toFixed(0));
+      const typeLabelsCount = typeKeys.map((type, idx) => {
+        const count = typeCounts[idx];
+        return `${type}형 ${count}명`;
       });
 
       // --- 1. 유형 도넛 차트 ---
@@ -343,7 +271,7 @@
       typeDoughnutChartInstance = new Chart(ctxDoughnut, {
         type: 'doughnut',
         data: {
-          labels: typeKeys,
+          labels: typeLabelsPercent,
           datasets: [{
             data: typeCounts,
             backgroundColor: [
@@ -368,7 +296,7 @@
       typeBarChartInstance = new Chart(ctxBar, {
         type: 'bar',
         data: {
-          labels: typeKeys,
+          labels: typeLabelsCount,
           datasets: [{
             label: '인원수(명)',
             data: typeCounts,
@@ -386,82 +314,6 @@
           scales: {
             y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 9 } } },
             x: { ticks: { font: { size: 10 } } }
-          }
-        }
-      });
-
-      // --- 3. 요인 평균 막대 차트 ---
-      const ctxFactorAvg = document.getElementById('factorAvgChart').getContext('2d');
-      if (factorAvgChartInstance) factorAvgChartInstance.destroy();
-      factorAvgChartInstance = new Chart(ctxFactorAvg, {
-        type: 'bar',
-        data: {
-          labels: factorKeys,
-          datasets: [
-            {
-              label: '평균 점수',
-              data: factorAverages,
-              backgroundColor: '#10b981',
-              borderRadius: 4
-            },
-            {
-              label: '위험 기준점',
-              data: factorKeys.map(f => thresholds[f]),
-              type: 'line',
-              borderColor: '#ef4444',
-              borderWidth: 2,
-              borderDash: [4, 4],
-              pointRadius: 0,
-              fill: false
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: true, labels: { boxWidth: 12, font: { size: 9 } } },
-            title: { display: true, text: '요인별 평균 점수', font: { size: 12, weight: 'bold' } }
-          },
-          scales: {
-            y: { beginAtZero: true, ticks: { font: { size: 9 } } },
-            x: { ticks: { font: { size: 9 }, maxRotation: 45, minRotation: 45 } }
-          }
-        }
-      });
-
-      // --- 4. 요인 높음 비율 누적 차트 ---
-      const ctxFactorRatio = document.getElementById('factorRatioChart').getContext('2d');
-      if (factorRatioChartInstance) factorRatioChartInstance.destroy();
-      factorRatioChartInstance = new Chart(ctxFactorRatio, {
-        type: 'bar',
-        data: {
-          labels: factorKeys,
-          datasets: [
-            {
-              label: '높음 (%)',
-              data: factorHighPercentages,
-              backgroundColor: '#2563eb',
-              borderRadius: 4
-            },
-            {
-              label: '낮음 (%)',
-              data: factorHighPercentages.map(p => 100 - p),
-              backgroundColor: '#e2e8f0',
-              borderRadius: 4
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 9 } } },
-            title: { display: true, text: '요인별 위험군(높음) 비율', font: { size: 12, weight: 'bold' } }
-          },
-          scales: {
-            y: { stacked: true, max: 100, ticks: { font: { size: 9 } } },
-            x: { stacked: true, ticks: { font: { size: 9 }, maxRotation: 45, minRotation: 45 } }
           }
         }
       });

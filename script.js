@@ -384,10 +384,7 @@ async function submitSurvey() {
     document.getElementById('resultType').innerText = type + '형';
     
     const details = typeDetails[type] || typeDetails['판정불가'];
-    document.getElementById('resultTypeDesc').innerText = details.summary;
     document.getElementById('typeDetailFeatures').innerText = details.features;
-    document.getElementById('typeDetailFactors').innerText = details.factors;
-    document.getElementById('typeDetailWarnings').innerText = details.warnings;
 
     const factorListContainer = document.getElementById('factorList');
     factorListContainer.innerHTML = '';
@@ -408,8 +405,6 @@ async function submitSurvey() {
       `;
       factorListContainer.appendChild(item);
     });
-
-    renderRadarChart(scores);
 
   } catch (err) {
     console.error(err);
